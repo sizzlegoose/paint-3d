@@ -1,122 +1,89 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import { useMemo, useRef } from 'react'
+import * as THREE from 'three'
 
-function App() {
-  const [count, setCount] = useState(0)
+const SIZE = 128
+
+
+function PaintTarget() {
+  const { texture, ctx } = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = SIZE
+    canvas.height = SIZE
+
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, SIZE, SIZE)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.magFilter = THREE.NearestFilter
+    return { texture, ctx }
+  }, [])
+
+  function paint(uv) {
+    const x = uv.x * SIZE
+    const y = (1 - uv.y) * SIZE
+
+    ctx.fillStyle = '#ff0000'
+    ctx.beginPath()
+    ctx.arc(x, y, 4, 0, Math.PI * 2)
+    ctx.fill()
+    texture.needsUpdate = true
+  }
+
+  const lastUV = useRef(null)
+
+  function strokeTo(uv) {
+    const x = uv.x * SIZE
+    const y = (1 - uv.y) * SIZE
+
+    ctx.strokeStyle = '#ff0000'
+    ctx.lineWidth = 8
+    ctx.lineCap = 'round'
+
+    ctx.beginPath()
+    if (lastUV.current) {
+      ctx.moveTo(lastUV.current.x * SIZE, (1 - lastUV.current.y) * SIZE)
+    } else {
+      ctx.moveTo(x, y)
+    }
+    ctx.lineTo(x, y)
+    ctx.stroke()
+
+    lastUV.current = { x: uv.x, y: uv.y }
+    texture.needsUpdate = true
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <mesh
+      onPointerDown={(e) => { if (e.button === 0) { lastUV.current = null; strokeTo(e.uv) } }}
+      onPointerMove={(e) => { if (e.buttons & 1) strokeTo(e.uv) }}
+      onPointerUp={() => { lastUV.current = null }}
+    >
+      <boxGeometry />
+      <meshStandardMaterial map={texture} />
+    </mesh>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <Canvas style={{ height: '100vh' }} camera={{ position: [0, 0, 3] }}>
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[5, 5, 5]} />
+      <PaintTarget />
+      <OrbitControls
+        mouseButtons={{
+          LEFT: null,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.ROTATE,
+        }}
+        touches={{
+          ONE: null,
+          TWO: THREE.TOUCH.DOLLY_ROTATE,
+        }}
+      />
+    </Canvas>
+  )
+}
