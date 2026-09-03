@@ -1,12 +1,18 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
+import { useMemo, useRef, useEffect } from 'react'
 import { OrbitControls } from '@react-three/drei'
-import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 const SIZE = 128
 
 
 function PaintTarget() {
+
+  const { camera, gl } = useThree()
+  const meshRef = useRef()
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const ndc = useMemo(() => new THREE.Vector2(), [])
+
   const { texture, ctx } = useMemo(() => {
     const canvas = document.createElement('canvas')
     canvas.width = SIZE
@@ -20,17 +26,6 @@ function PaintTarget() {
     texture.magFilter = THREE.NearestFilter
     return { texture, ctx }
   }, [])
-
-  function paint(uv) {
-    const x = uv.x * SIZE
-    const y = (1 - uv.y) * SIZE
-
-    ctx.fillStyle = '#ff0000'
-    ctx.beginPath()
-    ctx.arc(x, y, 4, 0, Math.PI * 2)
-    ctx.fill()
-    texture.needsUpdate = true
-  }
 
   const lastUV = useRef(null)
 
@@ -55,12 +50,55 @@ function PaintTarget() {
     texture.needsUpdate = true
   }
 
+  useEffect(() => {
+    const el = gl.domElement
+
+    function sample(clientX, clientY) {
+      const rect = el.getBoundingClientRect()
+      ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1
+      ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1
+
+      raycaster.setFromCamera(ndc, camera)
+      const hit = raycaster.intersectObject(meshRef.current)[0]
+
+      if (hit) strokeTo(hit.uv)
+      else lastUV.current = null
+
+    }
+
+    function onDown(e) {
+      if (e.button !== 0) return
+      el.setPointerCapture(e.pointerId)
+      lastUV.current = null
+      sample(e.clientX, e.clientY)
+    }
+    
+    function onMove(e) {
+      if (!(e.buttons & 1)) return
+      const samples = e.getCoalescedEvents?.() ?? [e]
+      console.log(samples.length)
+      for (const s of samples) sample(s.clientX, s.clientY)
+    }
+
+    function onUp(e) {
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      lastUV.current = null
+    }
+
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+
+    return () => {
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+    }
+  }, [camera, gl])
+
+  
   return (
-    <mesh
-      onPointerDown={(e) => { if (e.button === 0) { lastUV.current = null; strokeTo(e.uv) } }}
-      onPointerMove={(e) => { if (e.buttons & 1) strokeTo(e.uv) }}
-      onPointerUp={() => { lastUV.current = null }}
-    >
+    <mesh ref={meshRef}>
       <boxGeometry />
       <meshStandardMaterial map={texture} />
     </mesh>
