@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/immutability -- gl.autoClear must be toggled to accumulate
+   strokes; gl is an external renderer handle, not React state */
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Suspense, useMemo, useRef, useEffect } from 'react'
 import { OrbitControls, useGLTF } from '@react-three/drei'
@@ -6,9 +8,10 @@ import * as THREE from 'three'
 import { usePaintCanvas } from './usePaintCanvas'
 import { UVPreview } from './UVPreview'
 import { usePainter } from './usePainter'
+import { useDilate } from './useDilate'
 
-const SIZE = 128
-const RADIUS = 0.15
+const SIZE = 512
+const RADIUS = 0.05
 
 function PaintTarget({ geometry, texture }) {
 
@@ -18,10 +21,11 @@ function PaintTarget({ geometry, texture }) {
   const ndc = useMemo(() => new THREE.Vector2(), [])
   const stamps = useRef([])
   const lastPoint = useRef(null)
+  const needsDilate = useRef(false)
   const painter = usePainter(geometry, SIZE, RADIUS)
+  const dilate = useDilate(SIZE)
 
-  // Prime the target once with an opaque white base. Every later pass runs with
-  // autoClear off, so this is the only clear that ever happens.
+
   useEffect(() => {
     if (!painter) return
 
@@ -29,47 +33,61 @@ function PaintTarget({ geometry, texture }) {
     gl.getClearColor(prevColor)
     const prevAlpha = gl.getClearAlpha()
 
-    gl.setClearColor(0xffffff, 1)
+    gl.setClearColor(0xffffff, 0)
+
     gl.setRenderTarget(painter.target)
     gl.clear()
+    gl.render(painter.baseScene, painter.camera)
     gl.setRenderTarget(null)
+
     gl.setClearColor(prevColor, prevAlpha)
+
+    needsDilate.current = true
   }, [painter, gl])
 
-  // Drain the stamp queue into the target once per frame, before R3F renders the
-  // scene (priority 0). Batching here is what makes coalesced pointer samples cheap:
-  // many stamps, one render-target bind.
+
   useFrame(() => {
-    if (!painter || stamps.current.length === 0) return
+    if (!painter) return
 
-    const prevAutoClear = gl.autoClear
-    gl.autoClear = false // accumulate -- never wipe what earlier stamps wrote
+    if (stamps.current.length > 0) {
+      const prevAutoClear = gl.autoClear
+      gl.autoClear = false
 
-    gl.setRenderTarget(painter.target)
-    for (const p of stamps.current) {
-      painter.material.uniforms.uBrushPos.value.copy(p)
-      gl.render(painter.scene, painter.camera)
+      gl.setRenderTarget(painter.target)
+      for (const p of stamps.current) {
+        painter.material.uniforms.uBrushPos.value.copy(p)
+        gl.render(painter.scene, painter.camera)
+      }
+      gl.setRenderTarget(null)
+
+      gl.autoClear = prevAutoClear
+      stamps.current.length = 0
+      needsDilate.current = true
     }
-    gl.setRenderTarget(null)
 
-    gl.autoClear = prevAutoClear
-    stamps.current.length = 0
+    if (needsDilate.current) {
+      dilate.run(gl, painter.target.texture)
+      needsDilate.current = false
+    }
   })
 
-  // debug helper: call __probePaint() from the console to count painted texels
+  // debug helper: call __probePaint() from the console
   useEffect(() => {
     if (!painter) return
-    window.__probePaint = () => {
+    const count = (rt) => {
       const buf = new Uint8Array(SIZE * SIZE * 4)
-      gl.readRenderTargetPixels(painter.target, 0, 0, SIZE, SIZE, buf)
-      let painted = 0
-      for (let i = 0; i < buf.length; i += 4) {
-        if (buf[i] !== 255 || buf[i + 1] !== 255 || buf[i + 2] !== 255) painted++
-      }
-      console.log(`[probe] painted texels: ${painted} / ${SIZE * SIZE}`)
-      return painted
+      gl.readRenderTargetPixels(rt, 0, 0, SIZE, SIZE, buf)
+      let n = 0
+      for (let i = 3; i < buf.length; i += 4) if (buf[i] > 0) n++
+      return n
     }
-  }, [painter, gl])
+    window.__probePaint = () => {
+      const covered = count(painter.target)
+      const dilated = count(dilate.output)
+      console.log(`[probe] coverage: ${covered} / ${SIZE * SIZE} | after dilation: ${dilated}`)
+      return { covered, dilated }
+    }
+  }, [painter, gl, dilate])
 
   useEffect(() => {
     const el = gl.domElement
@@ -82,8 +100,6 @@ function PaintTarget({ geometry, texture }) {
       raycaster.setFromCamera(ndc, camera)
       const hit = raycaster.intersectObject(meshRef.current)[0]
 
-      // leaving the mesh breaks the stroke, so the next hit starts a fresh one
-      // instead of interpolating across the gap
       if (!hit) {
         lastPoint.current = null
         return
@@ -91,9 +107,6 @@ function PaintTarget({ geometry, texture }) {
 
       const p = meshRef.current.worldToLocal(hit.point.clone())
 
-      // Walk from the previous sample to this one so a fast drag paints a stroke
-      // rather than a dotted line. The chord through the sphere is a fine stand-in
-      // for the surface arc at these step sizes.
       const prev = lastPoint.current
       if (prev) {
         const steps = Math.floor(prev.distanceTo(p) / (RADIUS * 0.25))
@@ -137,7 +150,7 @@ function PaintTarget({ geometry, texture }) {
 
   return (
     <mesh ref={meshRef} geometry={geometry}>
-      <meshStandardMaterial map={painter ? painter.target.texture : texture} />
+      <meshStandardMaterial map={painter ? dilate.output.texture : texture} />
     </mesh>
   )
 }
