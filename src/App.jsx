@@ -10,6 +10,7 @@ import { ACTIONS } from './actions'
 
 export default function App() {
   const [toolId, setToolId] = useState(TOOLS[0].id)
+  const [color, setColor] = useState('#ff0000')
   const [history, setHistory] = useState({ canUndo: false, canRedo: false })
   const historyRef = useRef({})
   const tool = TOOLS.find((t) => t.id === toolId)
@@ -27,6 +28,9 @@ export default function App() {
         actions={ACTIONS}
         onAction={runAction}
         disabled={{ undo: !history.canUndo, redo: !history.canRedo }}
+        color={color}
+        onColorChange={setColor}
+        colorEnabled={tool.color === undefined}
       />
 
       <Canvas
@@ -36,7 +40,12 @@ export default function App() {
         <ambientLight intensity={0.8} />
         <directionalLight position={[5, 5, 5]} />
         <Suspense fallback={null}>
-          <Model tool={tool} historyRef={historyRef} onHistoryChange={setHistory} />
+          <Model
+            tool={tool}
+            color={color}
+            historyRef={historyRef}
+            onHistoryChange={setHistory}
+          />
         </Suspense>
         <OrbitControls
           mouseButtons={{

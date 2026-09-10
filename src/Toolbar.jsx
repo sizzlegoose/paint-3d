@@ -12,7 +12,17 @@ function buttonStyle({ active = false, disabled = false } = {}) {
   }
 }
 
-export function Toolbar({ tools, activeId, onSelect, actions, onAction, disabled }) {
+export function Toolbar({
+  tools,
+  activeId,
+  onSelect,
+  actions,
+  onAction,
+  disabled,
+  color,
+  onColorChange,
+  colorEnabled,
+}) {
   return (
     <div
       style={{
@@ -46,6 +56,37 @@ export function Toolbar({ tools, activeId, onSelect, actions, onAction, disabled
           {action.label}
         </button>
       ))}
+
+      <div style={{ height: 1, background: '#444', margin: '4px 0' }} />
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 4px',
+          color: '#aaa',
+          font: 'inherit',
+          opacity: colorEnabled ? 1 : 0.4,
+        }}
+      >
+        <input
+          type="color"
+          value={color}
+          disabled={!colorEnabled}
+          onChange={(e) => onColorChange(e.target.value)}
+          style={{
+            width: 32,
+            height: 32,
+            padding: 0,
+            background: 'transparent',
+            border: '1px solid #444',
+            borderRadius: 4,
+            cursor: colorEnabled ? 'pointer' : 'default',
+          }}
+        />
+        Color
+      </label>
     </div>
   )
 }

@@ -13,7 +13,7 @@ import { useHistory } from './useHistory'
 const SIZE = 512
 const RADIUS = 0.05
 
-function PaintTarget({ geometry, tool, historyRef, onHistoryChange }) {
+function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
   const { gl } = useThree()
   const meshRef = useRef()
   const needsDilate = useRef(false)
@@ -76,7 +76,7 @@ function PaintTarget({ geometry, tool, historyRef, onHistoryChange }) {
       const prevAutoClear = gl.autoClear
       gl.autoClear = false
 
-      painter.material.uniforms.uColor.value.set(tool.color)
+      painter.material.uniforms.uColor.value.set(tool.color ?? color)
 
       gl.setRenderTarget(painter.target)
       for (const p of stamps.current) {
@@ -120,12 +120,13 @@ function PaintTarget({ geometry, tool, historyRef, onHistoryChange }) {
   )
 }
 
-export function Model({ tool, historyRef, onHistoryChange }) {
+export function Model({ tool, color, historyRef, onHistoryChange }) {
   const { nodes } = useGLTF('/models/icosphere.glb')
   return (
     <PaintTarget
       geometry={nodes.Icosphere.geometry}
       tool={tool}
+      color={color}
       historyRef={historyRef}
       onHistoryChange={onHistoryChange}
     />
