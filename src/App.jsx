@@ -16,7 +16,11 @@ export default function App() {
   const [toolId, setToolId] = useState(TOOLS[0].id)
   const [color, setColor] = useState('#ff0000')
   const [size, setSize] = useState('0.05')
-  const [history, setHistory] = useState({ canUndo: false, canRedo: false })
+  const [status, setStatus] = useState({
+    canUndo: false,
+    canRedo: false,
+    canClear: false,
+  })
   const apiRef = useRef({})
   const tool = TOOLS.find((t) => t.id === toolId)
   const submit = useSubmit()
@@ -39,7 +43,11 @@ export default function App() {
         onSelect={setToolId}
         actions={ACTIONS}
         onAction={runAction}
-        disabled={{ undo: !history.canUndo, redo: !history.canRedo }}
+        disabled={{
+          undo: !status.canUndo,
+          redo: !status.canRedo,
+          clear: !status.canClear,
+        }}
         color={color}
         onColorChange={setColor}
         colorEnabled={tool.color === undefined}
@@ -60,7 +68,7 @@ export default function App() {
             color={color}
             radius={radius}
             apiRef={apiRef}
-            onHistoryChange={setHistory}
+            onStatusChange={setStatus}
           />
         </Suspense>
         <OrbitControls

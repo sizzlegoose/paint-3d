@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 
-export function useStroke(meshRef, pick, spacing, onStrokeStart, enabled) {
+export function useStroke(meshRef, pick, spacing, onStrokeStart, onStrokeEnd, enabled) {
   const { gl } = useThree()
   const stamps = useRef([])
   const lastPoint = useRef(null)
@@ -57,9 +57,13 @@ export function useStroke(meshRef, pick, spacing, onStrokeStart, enabled) {
 
     function onUp(e) {
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+
+      const wasActive = strokeActive.current
       pressed.current = false
       strokeActive.current = false
       lastPoint.current = null
+
+      if (wasActive) onStrokeEnd()
     }
 
     el.addEventListener('pointerdown', onDown)
@@ -71,7 +75,7 @@ export function useStroke(meshRef, pick, spacing, onStrokeStart, enabled) {
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('pointerup', onUp)
     }
-  }, [gl, meshRef, pick, spacing, onStrokeStart, enabled])
+  }, [gl, meshRef, pick, spacing, onStrokeStart, onStrokeEnd, enabled])
 
   return stamps
 }

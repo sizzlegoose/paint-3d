@@ -11,30 +11,48 @@ import { useStroke } from './useStroke'
 import { useHistory } from './useHistory'
 import { usePicker } from './usePicker'
 import { useBucketFill } from './useBucketFill'
+import { useClearCheck } from './useClearCheck'
 import { BrushCursor } from './BrushCursor'
 
 const SIZE = 512
 
-function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange }) {
+function PaintTarget({ geometry, tool, color, radius, apiRef, onStatusChange }) {
   const { gl } = useThree()
   const meshRef = useRef()
   const needsDilate = useRef(false)
+  const canClear = useRef(false)
+  const checkPending = useRef(false)
   const painter = usePainter(geometry, SIZE)
   const dilate = useDilate(SIZE)
   const history = useHistory(SIZE)
   const pick = usePicker(meshRef)
   const bucket = useBucketFill(geometry, SIZE)
+  const clearCheck = useClearCheck(SIZE)
   const clickMode = tool.mode === 'click'
 
   const report = useCallback(() => {
-    onHistoryChange({ canUndo: history.canUndo, canRedo: history.canRedo })
-  }, [history, onHistoryChange])
+    onStatusChange({
+      canUndo: history.canUndo,
+      canRedo: history.canRedo,
+      canClear: canClear.current,
+    })
+  }, [history, onStatusChange])
+
+  const refreshClearState = useCallback(() => {
+    if (!painter) return
+    canClear.current = !clearCheck.isClear(gl, painter.target)
+    report()
+  }, [clearCheck, gl, painter, report])
 
   const handleStrokeStart = useCallback(() => {
     if (!painter) return
     history.capture(gl, painter.target)
     report()
   }, [history, gl, painter, report])
+
+  const handleStrokeEnd = useCallback(() => {
+    checkPending.current = true
+  }, [])
 
   const resetToBase = useCallback(() => {
     if (!painter) return
@@ -55,7 +73,14 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange })
     needsDilate.current = true
   }, [gl, painter])
 
-  const stamps = useStroke(meshRef, pick, radius * 0.25, handleStrokeStart, !clickMode)
+  const stamps = useStroke(
+    meshRef,
+    pick,
+    radius * 0.25,
+    handleStrokeStart,
+    handleStrokeEnd,
+    !clickMode
+  )
 
   useEffect(() => {
     if (!painter || !bucket || !clickMode) return
@@ -71,12 +96,12 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange })
       history.capture(gl, painter.target)
       bucket.fill(gl, painter.target, hit.uv, tool.color ?? color)
       needsDilate.current = true
-      report()
+      refreshClearState()
     }
 
     el.addEventListener('pointerdown', onDown)
     return () => el.removeEventListener('pointerdown', onDown)
-  }, [gl, pick, painter, bucket, clickMode, history, report, tool, color])
+  }, [gl, pick, painter, bucket, clickMode, history, refreshClearState, tool, color])
 
   useEffect(() => {
     if (!painter) return
@@ -85,24 +110,31 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange })
       undo: () => {
         if (!history.undo(gl, painter.target)) return
         needsDilate.current = true
-        report()
+        refreshClearState()
       },
       redo: () => {
         if (!history.redo(gl, painter.target)) return
         needsDilate.current = true
-        report()
+        refreshClearState()
       },
       clear: () => {
+        if (!canClear.current) return
         history.capture(gl, painter.target)
         resetToBase()
+        canClear.current = false
         report()
       },
     }
-  }, [apiRef, history, gl, painter, report, resetToBase])
+  }, [apiRef, history, gl, painter, report, refreshClearState, resetToBase])
 
   useEffect(() => {
+    if (!painter) return
+
     resetToBase()
-  }, [resetToBase])
+    clearCheck.rememberBase(gl, painter.target)
+    canClear.current = false
+    report()
+  }, [resetToBase, clearCheck, gl, painter, report])
 
   useFrame(() => {
     if (!painter) return
@@ -129,6 +161,11 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange })
     if (needsDilate.current) {
       dilate.run(gl, painter.target.texture)
       needsDilate.current = false
+    }
+
+    if (checkPending.current) {
+      checkPending.current = false
+      refreshClearState()
     }
   })
 
@@ -160,7 +197,7 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange })
   )
 }
 
-export function Model({ tool, color, radius, apiRef, onHistoryChange }) {
+export function Model({ tool, color, radius, apiRef, onStatusChange }) {
   const { nodes } = useGLTF('/models/icosphere.glb')
   return (
     <PaintTarget
@@ -169,7 +206,7 @@ export function Model({ tool, color, radius, apiRef, onHistoryChange }) {
       color={color}
       radius={radius}
       apiRef={apiRef}
-      onHistoryChange={onHistoryChange}
+      onStatusChange={onStatusChange}
     />
   )
 }
