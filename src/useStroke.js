@@ -1,26 +1,20 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
-import * as THREE from 'three'
 
-export function useStroke(meshRef, spacing, onStrokeStart) {
-  const { camera, gl } = useThree()
-  const raycaster = useMemo(() => new THREE.Raycaster(), [])
-  const ndc = useMemo(() => new THREE.Vector2(), [])
+export function useStroke(meshRef, pick, spacing, onStrokeStart, enabled) {
+  const { gl } = useThree()
   const stamps = useRef([])
   const lastPoint = useRef(null)
   const pressed = useRef(false)
   const strokeActive = useRef(false)
 
   useEffect(() => {
+    if (!enabled) return
+
     const el = gl.domElement
 
     function sample(clientX, clientY) {
-      const rect = el.getBoundingClientRect()
-      ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1
-      ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1
-
-      raycaster.setFromCamera(ndc, camera)
-      const hit = raycaster.intersectObject(meshRef.current)[0]
+      const hit = pick(clientX, clientY)
 
       if (!hit) {
         lastPoint.current = null
@@ -77,7 +71,7 @@ export function useStroke(meshRef, spacing, onStrokeStart) {
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('pointerup', onUp)
     }
-  }, [camera, gl, meshRef, ndc, raycaster, spacing, onStrokeStart])
+  }, [gl, meshRef, pick, spacing, onStrokeStart, enabled])
 
   return stamps
 }

@@ -1,15 +1,7 @@
-function buttonStyle({ active = false, disabled = false } = {}) {
-  return {
-    padding: '8px 16px',
-    font: 'inherit',
-    textAlign: 'left',
-    borderRadius: 4,
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.4 : 1,
-    color: active ? '#fff' : '#aaa',
-    background: active ? '#333' : 'transparent',
-    border: `1px solid ${active ? '#888' : '#444'}`,
-  }
+import styles from './Toolbar.module.css'
+
+function rowClass(enabled) {
+  return enabled ? styles.settingRow : `${styles.settingRow} ${styles.settingRowDisabled}`
 }
 
 export function Toolbar({
@@ -22,70 +14,62 @@ export function Toolbar({
   color,
   onColorChange,
   colorEnabled,
+  size,
+  onSizeChange,
+  sizeEnabled,
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        padding: 12,
-        background: '#1a1a1a',
-        flexShrink: 0,
-      }}
-    >
+    <div className={styles.panel}>
       {tools.map((tool) => (
         <button
           key={tool.id}
           onClick={() => onSelect(tool.id)}
-          style={buttonStyle({ active: tool.id === activeId })}
+          className={
+            tool.id === activeId ? `${styles.button} ${styles.isActive}` : styles.button
+          }
         >
           {tool.label}
         </button>
       ))}
 
-      <div style={{ height: 1, background: '#444', margin: '4px 0' }} />
+      <div className={styles.separator} />
 
       {actions.map((action) => (
         <button
           key={action.id}
           onClick={() => onAction(action.id)}
           disabled={disabled[action.id]}
-          style={buttonStyle({ disabled: disabled[action.id] })}
+          className={styles.button}
         >
           {action.label}
         </button>
       ))}
 
-      <div style={{ height: 1, background: '#444', margin: '4px 0' }} />
+      <div className={styles.separator} />
 
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '0 4px',
-          color: '#aaa',
-          font: 'inherit',
-          opacity: colorEnabled ? 1 : 0.4,
-        }}
-      >
+      <label className={rowClass(colorEnabled)}>
         <input
           type="color"
           value={color}
           disabled={!colorEnabled}
           onChange={(e) => onColorChange(e.target.value)}
-          style={{
-            width: 32,
-            height: 32,
-            padding: 0,
-            background: 'transparent',
-            border: '1px solid #444',
-            borderRadius: 4,
-            cursor: colorEnabled ? 'pointer' : 'default',
-          }}
+          className={styles.swatch}
         />
         Color
+      </label>
+
+      <label className={rowClass(sizeEnabled)}>
+        <input
+          type="number"
+          value={size}
+          disabled={!sizeEnabled}
+          min="0.005"
+          max="0.5"
+          step="0.01"
+          onChange={(e) => onSizeChange(e.target.value)}
+          className={styles.numberInput}
+        />
+        Size
       </label>
     </div>
   )

@@ -9,17 +9,22 @@ import { usePainter } from './usePainter'
 import { useDilate } from './useDilate'
 import { useStroke } from './useStroke'
 import { useHistory } from './useHistory'
+import { usePicker } from './usePicker'
+import { useBucketFill } from './useBucketFill'
+import { BrushCursor } from './BrushCursor'
 
 const SIZE = 512
-const RADIUS = 0.05
 
-function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
+function PaintTarget({ geometry, tool, color, radius, apiRef, onHistoryChange }) {
   const { gl } = useThree()
   const meshRef = useRef()
   const needsDilate = useRef(false)
-  const painter = usePainter(geometry, SIZE, RADIUS)
+  const painter = usePainter(geometry, SIZE)
   const dilate = useDilate(SIZE)
   const history = useHistory(SIZE)
+  const pick = usePicker(meshRef)
+  const bucket = useBucketFill(geometry, SIZE)
+  const clickMode = tool.mode === 'click'
 
   const report = useCallback(() => {
     onHistoryChange({ canUndo: history.canUndo, canRedo: history.canRedo })
@@ -31,26 +36,7 @@ function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
     report()
   }, [history, gl, painter, report])
 
-  const stamps = useStroke(meshRef, RADIUS * 0.25, handleStrokeStart)
-
-  useEffect(() => {
-    if (!painter) return
-
-    historyRef.current = {
-      undo: () => {
-        if (!history.undo(gl, painter.target)) return
-        needsDilate.current = true
-        report()
-      },
-      redo: () => {
-        if (!history.redo(gl, painter.target)) return
-        needsDilate.current = true
-        report()
-      },
-    }
-  }, [historyRef, history, gl, painter, report])
-
-  useEffect(() => {
+  const resetToBase = useCallback(() => {
     if (!painter) return
 
     const prevColor = new THREE.Color()
@@ -67,7 +53,56 @@ function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
     gl.setClearColor(prevColor, prevAlpha)
 
     needsDilate.current = true
-  }, [painter, gl])
+  }, [gl, painter])
+
+  const stamps = useStroke(meshRef, pick, radius * 0.25, handleStrokeStart, !clickMode)
+
+  useEffect(() => {
+    if (!painter || !bucket || !clickMode) return
+
+    const el = gl.domElement
+
+    function onDown(e) {
+      if (e.button !== 0) return
+
+      const hit = pick(e.clientX, e.clientY)
+      if (!hit || !hit.uv) return
+
+      history.capture(gl, painter.target)
+      bucket.fill(gl, painter.target, hit.uv, tool.color ?? color)
+      needsDilate.current = true
+      report()
+    }
+
+    el.addEventListener('pointerdown', onDown)
+    return () => el.removeEventListener('pointerdown', onDown)
+  }, [gl, pick, painter, bucket, clickMode, history, report, tool, color])
+
+  useEffect(() => {
+    if (!painter) return
+
+    apiRef.current = {
+      undo: () => {
+        if (!history.undo(gl, painter.target)) return
+        needsDilate.current = true
+        report()
+      },
+      redo: () => {
+        if (!history.redo(gl, painter.target)) return
+        needsDilate.current = true
+        report()
+      },
+      clear: () => {
+        history.capture(gl, painter.target)
+        resetToBase()
+        report()
+      },
+    }
+  }, [apiRef, history, gl, painter, report, resetToBase])
+
+  useEffect(() => {
+    resetToBase()
+  }, [resetToBase])
 
   useFrame(() => {
     if (!painter) return
@@ -77,6 +112,7 @@ function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
       gl.autoClear = false
 
       painter.material.uniforms.uColor.value.set(tool.color ?? color)
+      painter.material.uniforms.uRadius.value = radius
 
       gl.setRenderTarget(painter.target)
       for (const p of stamps.current) {
@@ -114,20 +150,25 @@ function PaintTarget({ geometry, tool, color, historyRef, onHistoryChange }) {
   }, [painter, gl, dilate])
 
   return (
-    <mesh ref={meshRef} geometry={geometry}>
-      <meshStandardMaterial map={dilate.output.texture} />
-    </mesh>
+    <>
+      <mesh ref={meshRef} geometry={geometry}>
+        <meshStandardMaterial map={dilate.output.texture} />
+      </mesh>
+
+      <BrushCursor pick={pick} radius={radius} enabled={!clickMode} />
+    </>
   )
 }
 
-export function Model({ tool, color, historyRef, onHistoryChange }) {
+export function Model({ tool, color, radius, apiRef, onHistoryChange }) {
   const { nodes } = useGLTF('/models/icosphere.glb')
   return (
     <PaintTarget
       geometry={nodes.Icosphere.geometry}
       tool={tool}
       color={color}
-      historyRef={historyRef}
+      radius={radius}
+      apiRef={apiRef}
       onHistoryChange={onHistoryChange}
     />
   )

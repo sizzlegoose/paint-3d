@@ -7,16 +7,28 @@ import { Model } from './PaintTarget'
 import { Toolbar } from './Toolbar'
 import { TOOLS } from './tools'
 import { ACTIONS } from './actions'
+import { useSubmit } from './useSubmit'
+
+const MIN_RADIUS = 0.005
+const MAX_RADIUS = 0.5
 
 export default function App() {
   const [toolId, setToolId] = useState(TOOLS[0].id)
   const [color, setColor] = useState('#ff0000')
+  const [size, setSize] = useState('0.05')
   const [history, setHistory] = useState({ canUndo: false, canRedo: false })
-  const historyRef = useRef({})
+  const apiRef = useRef({})
   const tool = TOOLS.find((t) => t.id === toolId)
+  const submit = useSubmit()
+
+  const parsed = Number(size)
+  const radius = Number.isFinite(parsed)
+    ? Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, parsed))
+    : MIN_RADIUS
 
   function runAction(id) {
-    historyRef.current[id]?.()
+    if (id === 'submit') return submit()
+    apiRef.current[id]?.()
   }
 
   return (
@@ -31,6 +43,9 @@ export default function App() {
         color={color}
         onColorChange={setColor}
         colorEnabled={tool.color === undefined}
+        size={size}
+        onSizeChange={setSize}
+        sizeEnabled={tool.mode === 'stroke'}
       />
 
       <Canvas
@@ -43,7 +58,8 @@ export default function App() {
           <Model
             tool={tool}
             color={color}
-            historyRef={historyRef}
+            radius={radius}
+            apiRef={apiRef}
             onHistoryChange={setHistory}
           />
         </Suspense>
