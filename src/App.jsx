@@ -8,6 +8,9 @@ import { Toolbar } from './Toolbar'
 import { TOOLS } from './tools'
 import { ACTIONS } from './actions'
 import { useSubmit } from './useSubmit'
+import { SubmitPanel } from './SubmitPanel'
+import { Snapshotter } from './Snapshotter'
+import styles from './App.module.css'
 
 const MIN_RADIUS = 0.005
 const MAX_RADIUS = 0.5
@@ -23,7 +26,7 @@ export default function App() {
   })
   const apiRef = useRef({})
   const tool = TOOLS.find((t) => t.id === toolId)
-  const submit = useSubmit()
+  const { isOpen, image, submit, close } = useSubmit(apiRef)
 
   const parsed = Number(size)
   const radius = Number.isFinite(parsed)
@@ -36,53 +39,61 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      <Toolbar
-        tools={TOOLS}
-        activeId={toolId}
-        onSelect={setToolId}
-        actions={ACTIONS}
-        onAction={runAction}
-        disabled={{
-          undo: !status.canUndo,
-          redo: !status.canRedo,
-          clear: !status.canClear,
-        }}
-        color={color}
-        onColorChange={setColor}
-        colorEnabled={tool.color === undefined}
-        size={size}
-        onSizeChange={setSize}
-        sizeEnabled={tool.mode === 'stroke'}
-      />
-
-      <Canvas
-        style={{ height: '100vh', flex: 1, minWidth: 0 }}
-        camera={{ position: [0, 0, 3] }}
+    <>
+      <div
+        className={isOpen ? `${styles.app} ${styles.dimmed}` : styles.app}
+        inert={isOpen}
       >
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[5, 5, 5]} />
-        <Suspense fallback={null}>
-          <Model
-            tool={tool}
-            color={color}
-            radius={radius}
-            apiRef={apiRef}
-            onStatusChange={setStatus}
-          />
-        </Suspense>
-        <OrbitControls
-          mouseButtons={{
-            LEFT: null,
-            MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.ROTATE,
+        <Toolbar
+          tools={TOOLS}
+          activeId={toolId}
+          onSelect={setToolId}
+          actions={ACTIONS}
+          onAction={runAction}
+          disabled={{
+            undo: !status.canUndo,
+            redo: !status.canRedo,
+            clear: !status.canClear,
           }}
-          touches={{
-            ONE: null,
-            TWO: THREE.TOUCH.DOLLY_ROTATE,
-          }}
+          color={color}
+          onColorChange={setColor}
+          colorEnabled={tool.color === undefined}
+          size={size}
+          onSizeChange={setSize}
+          sizeEnabled={tool.mode === 'stroke'}
         />
-      </Canvas>
-    </div>
+
+        <Canvas
+          style={{ height: '100vh', flex: 1, minWidth: 0 }}
+          camera={{ position: [0, 0, 3] }}
+        >
+          <ambientLight intensity={0.8} />
+          <directionalLight position={[5, 5, 5]} />
+          <Suspense fallback={null}>
+            <Model
+              tool={tool}
+              color={color}
+              radius={radius}
+              apiRef={apiRef}
+              onStatusChange={setStatus}
+            />
+          </Suspense>
+          <Snapshotter apiRef={apiRef} />
+          <OrbitControls
+            mouseButtons={{
+              LEFT: null,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.ROTATE,
+            }}
+            touches={{
+              ONE: null,
+              TWO: THREE.TOUCH.DOLLY_ROTATE,
+            }}
+          />
+        </Canvas>
+      </div>
+
+      {isOpen && <SubmitPanel image={image} onClose={close} />}
+    </>
   )
 }

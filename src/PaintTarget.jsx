@@ -106,7 +106,7 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onStatusChange }) 
   useEffect(() => {
     if (!painter) return
 
-    apiRef.current = {
+    Object.assign(apiRef.current, {
       undo: () => {
         if (!history.undo(gl, painter.target)) return
         needsDilate.current = true
@@ -124,7 +124,7 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onStatusChange }) 
         canClear.current = false
         report()
       },
-    }
+    })
   }, [apiRef, history, gl, painter, report, refreshClearState, resetToBase])
 
   useEffect(() => {

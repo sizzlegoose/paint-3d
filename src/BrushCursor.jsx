@@ -57,7 +57,12 @@ export function BrushCursor({ pick, radius, enabled }) {
   })
 
   return (
-    <mesh ref={ringRef} visible={false} frustumCulled={false}>
+    <mesh
+      ref={ringRef}
+      visible={false}
+      frustumCulled={false}
+      userData={{ excludeFromSnapshot: true }}
+    >
       <ringGeometry args={[0.94, 1, 48]} />
       <meshBasicMaterial
         color="#ffffff"

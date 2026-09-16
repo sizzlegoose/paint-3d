@@ -1,0 +1,10 @@
+.app {
+  display: flex;
+  height: 100vh;
+  transition: opacity 160ms ease;
+}
+
+.dimmed {
+  opacity: 0.35;
+  pointer-events: none;
+}
