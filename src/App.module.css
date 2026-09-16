@@ -1,6 +1,7 @@
 .app {
-  display: flex;
+  position: relative;
   height: 100vh;
+  overflow: hidden;
   transition: opacity 160ms ease;
 }
 

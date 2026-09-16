@@ -4,7 +4,7 @@ import vertexShader from './shaders/fullscreen.vert?raw'
 import fragmentShader from './shaders/fill.frag?raw'
 import { buildSeamLinks } from './seamLinks'
 
-const TOLERANCE = 12
+const TOLERANCE = 12 //12
 
 export function useBucketFill(geometry, size) {
   return useMemo(() => {

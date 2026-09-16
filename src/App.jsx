@@ -10,6 +10,7 @@ import { ACTIONS } from './actions'
 import { useSubmit } from './useSubmit'
 import { SubmitPanel } from './SubmitPanel'
 import { Snapshotter } from './Snapshotter'
+import { AliasFilter } from './AliasFilter'
 import styles from './App.module.css'
 
 const MIN_RADIUS = 0.005
@@ -40,6 +41,8 @@ export default function App() {
 
   return (
     <>
+      <AliasFilter />
+
       <div
         className={isOpen ? `${styles.app} ${styles.dimmed}` : styles.app}
         inert={isOpen}
@@ -64,7 +67,7 @@ export default function App() {
         />
 
         <Canvas
-          style={{ height: '100vh', flex: 1, minWidth: 0 }}
+          style={{ width: '100%', height: '100%' }}
           camera={{ position: [0, 0, 3] }}
         >
           <ambientLight intensity={0.8} />

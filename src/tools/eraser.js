@@ -3,4 +3,5 @@ export const eraser = {
   label: 'Eraser',
   mode: 'stroke',
   color: '#ffffff',
+  accent: '#ffc65d',
 }
