@@ -192,7 +192,7 @@ function PaintTarget({ geometry, tool, color, radius, apiRef, onStatusChange }) 
         <meshStandardMaterial map={dilate.output.texture} />
       </mesh>
 
-      <BrushCursor pick={pick} radius={radius} enabled={!clickMode} />
+      <BrushCursor meshRef={meshRef} pick={pick} radius={radius} enabled={!clickMode} />
     </>
   )
 }
